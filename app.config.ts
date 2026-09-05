@@ -16,6 +16,8 @@ const config: ExpoConfig = {
   },
   android: { package: "com.bowlord23.ourplant" },
   extra: { eas: { projectId: "985492ed-d728-4ba5-85a4-43a8c0079152" } },
+  updates: { url: "https://u.expo.dev/985492ed-d728-4ba5-85a4-43a8c0079152" },
+  runtimeVersion: { policy: "appVersion" },
   plugins: ["expo-router", "expo-secure-store", "expo-notifications"],
   web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
 };
