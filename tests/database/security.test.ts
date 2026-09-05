@@ -20,7 +20,7 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
       grant usage on schema public,auth,realtime to authenticated,anon;
       grant select,insert on realtime.messages to authenticated;`);
     await db.exec(
-      readFileSync("supabase/migrations/202609050001_initial.sql", "utf8"),
+      readFileSync("supabase/migrations/20260905192934_initial.sql", "utf8"),
     );
     await db.exec(
       `insert into auth.users values('${A}'),('${B}'),('${C}'),('${D}')`,

@@ -4,8 +4,13 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import type { Database } from "../types/database";
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const url =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ??
+  "https://dwdclseobbibwnhwbbid.supabase.co";
+const key =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  "sb_publishable_b07iThjbVNs128zl9i0mHQ_t0U9m1sQ";
 export const isConfigured =
   /^https:\/\/.+\.supabase\.co\/?$/.test(url) && key.length > 20;
 // Web is a preview only: keep sessions in memory, never in localStorage.

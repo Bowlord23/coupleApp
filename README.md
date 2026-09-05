@@ -60,39 +60,40 @@ npm.cmd ci
 `npm ci` устанавливает именно версии из lockfile. На macOS/Linux можно писать
 `npm` вместо `npm.cmd`. Все дальнейшие команды выполняются **в папке coupleApp**.
 
-## 2. Создание Supabase
+## 2. Supabase уже подключён
 
-1. Войдите в [Supabase](https://supabase.com/dashboard) и создайте New project.
-2. Сохраните пароль базы в своём менеджере паролей. Приложению он не нужен.
-3. После создания откройте Connect либо Settings → API / API Keys.
-4. Скопируйте Project URL вида `https://ваш-проект.supabase.co`.
-5. Скопируйте публичный publishable key либо legacy **anon** key.
-   Не копируйте `service_role` или secret key в приложение.
-6. Выполните:
+Приложение подключено к рабочему проекту **OurPlant** в Supabase. URL и
+publishable key встроены в клиент, поэтому после клонирования не нужно создавать
+проект, выполнять SQL или заполнять `.env`. Публичный ключ можно безопасно
+включать в мобильное приложение: доступ к данным ограничен RLS-политиками.
+
+Локальный `.env` нужен только для запуска собственной копии бэкенда. Он
+переопределяет встроенные значения:
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
 ```
 
-В файле найдите пустые строки и заполните их своими значениями:
-
 ```dotenv
 EXPO_PUBLIC_SUPABASE_URL=https://ВАШ-ПРОЕКТ.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=ВАШ_ПУБЛИЧНЫЙ_КЛЮЧ
 ```
 
-Это пример формата, а не работающие значения. `.env` исключён из Git.
-Публичный ключ будет внутри приложения: данные защищает RLS, а не скрытность ключа.
+.env исключён из Git.
 Не помещайте пароль базы, service role, Apple certificates или SMTP-пароль
 в переменные с префиксом `EXPO_PUBLIC_`.
 
-## 3. Создание таблиц и правил доступа
+## 3. База данных
 
-Самый простой путь для нового проекта:
+Миграция `supabase/migrations/20260905192934_initial.sql` уже применена к
+проекту OurPlant. Созданы 8 публичных таблиц, на всех включён RLS; функции,
+Realtime-публикация и политики приватных каналов также установлены.
+
+Для отдельного нового Supabase-проекта:
 
 1. В Supabase откройте **SQL Editor → New query**.
-2. В репозитории откройте `supabase/migrations/202609050001_initial.sql`.
+2. В репозитории откройте `supabase/migrations/20260905192934_initial.sql`.
 3. Скопируйте весь файл в SQL Editor и нажмите Run **один раз**.
 4. В Table Editor появятся `profiles`, `couples`, `couple_members`, `plants`,
    `plant_actions`, `notes`, `memories`, `push_tokens`. На всех включён RLS.
@@ -112,39 +113,29 @@ Project ref — часть URL до `.supabase.co`. При последующе�
 SQL на CLI отметьте уже выполненную миграцию, чтобы не применить её повторно:
 
 ```powershell
-npx supabase migration repair 202609050001 --status applied
+npx supabase migration repair 20260905192934 --status applied
 ```
 
-## 4. Настройка email-кода
+## 4. Вход по email и паролю
 
-В Supabase Authentication включите Email provider и регистрацию пользователей.
-В Email Templates → **Magic Link** измените содержимое письма, включив код:
+Регистрация и вход уже настроены и не требуют писем: пользователь вводит email,
+придумывает пароль длиной от 8 символов и сразу получает сессию. Подтверждение
+email отключено, потому что встроенный SMTP Supabase отправляет письма только
+участникам организации. Благодаря этому оба партнёра могут зарегистрироваться
+без отдельного почтового сервиса.
 
-```html
-<h2>Ваш код входа</h2>
-<p>{{ .Token }}</p>
-<p>Введите этот код в приложении.</p>
-```
+Для публичного релиза стоит подключить Custom SMTP, включить подтверждение email
+и добавить восстановление пароля. Настройки почты и её секреты должны храниться
+в Supabase, а не в мобильном приложении.
 
-Клиент использует `signInWithOtp` и `verifyOtp`, поэтому ссылка из письма
-не нужна. Один и тот же экран регистрирует нового пользователя и впускает
-существующего. Введите код полностью; клиент поддерживает 6–10 цифр.
-
-Для проверки с двумя реальными email настройте Custom SMTP в Supabase:
-встроенный отправитель имеет ограничения адресатов и частоты. Настройки почты
-хранятся на Supabase, не в мобильном приложении. Если письмо не приходит,
-проверьте Spam, Auth Logs, SMTP и лимиты перед повторной отправкой.
-См. [официальное описание email OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless).
-
-## 5. Включение Realtime
+## 5. Realtime
 
 Миграция добавляет таблицы растения, пары, участников, записок и моментов
 в публикацию `supabase_realtime`. В Supabase Database → Replication / Publications
 проверьте их наличие.
 
-В Realtime Settings **отключите Allow public access**. Клиент использует
-`private: true`; права на Presence и Broadcast проверяются политиками
-`realtime.messages`. Это важная часть настройки, а не необязательное улучшение.
+Публичный доступ к каналам уже отключён. Клиент использует `private: true`;
+права на Presence и Broadcast проверяются политиками `realtime.messages`.
 См. [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization).
 
 Если Realtime недоступен, интерфейс перепроверяет сервер каждые 30 секунд
@@ -316,8 +307,8 @@ npm.cmd run start -- --dev-client
 
 EAS может потребовать Apple Developer account и регистрацию телефона. При
 `eas init` сохраните созданный `extra.eas.projectId` в `app.config.ts`.
-В EAS Environment Variables добавьте те же публичные Supabase URL и key;
-локальный `.env` не заменяет конфигурацию облачной сборки.
+Для собственной копии бэкенда добавьте публичные Supabase URL и key в EAS
+Environment Variables. Основной проект использует встроенную конфигурацию.
 
 Для Android development build:
 

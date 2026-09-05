@@ -16,17 +16,18 @@ import { useTask } from "../../hooks/useTask";
 export default function AuthScreen() {
   const [started, setStarted] = useState(false);
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [registering, setRegistering] = useState(true);
   const task = useTask();
-  const send = () =>
+  const submit = () =>
     task.run(async () => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: true },
-      });
+      const credentials = { email: email.trim(), password };
+      const { data, error } = registering
+        ? await supabase.auth.signUp(credentials)
+        : await supabase.auth.signInWithPassword(credentials);
       if (error) throw error;
-      setSent(true);
+      if (!data.session)
+        throw new Error("Аккаунт создан, но Supabase не открыл сессию.");
     });
   return (
     <Screen>
@@ -43,11 +44,11 @@ export default function AuthScreen() {
         </>
       ) : (
         <>
-          <Title>{sent ? "Письмо для вас" : "Добро пожаловать"}</Title>
+          <Title>{registering ? "Создать аккаунт" : "С возвращением"}</Title>
           <Copy>
-            {sent
-              ? "Введите код из письма. Он подходит и для первого входа, и для возвращения."
-              : "Ваш email — чтобы сохранить наше маленькое пространство."}
+            {registering
+              ? "Придумайте пароль, чтобы сохранить ваше маленькое пространство."
+              : "Введите email и пароль, которые использовали при регистрации."}
           </Copy>
           <Field
             label="Email"
@@ -56,67 +57,43 @@ export default function AuthScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
-            editable={!sent && !task.busy}
+            editable={!task.busy}
           />
-          {sent && (
-            <Field
-              label="Код из письма"
-              value={code}
-              onChangeText={setCode}
-              keyboardType="number-pad"
-              autoComplete="one-time-code"
-              maxLength={10}
-            />
-          )}
+          <Field
+            label="Пароль"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Не меньше 8 символов"
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete={registering ? "new-password" : "current-password"}
+            editable={!task.busy}
+          />
           <ErrorMessage message={task.error} />
           <Button
             disabled={
               task.busy ||
-              (sent
-                ? !/^\d{6,10}$/.test(code)
-                : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+              password.length < 8 ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
             }
             title={
               task.busy
                 ? "Подождите…"
-                : sent
-                  ? "Войти в пространство"
-                  : "Получить код"
+                : registering
+                  ? "Создать аккаунт"
+                  : "Войти"
             }
+            onPress={() => void submit()}
+          />
+          <Button
+            title={registering ? "У меня уже есть аккаунт" : "Создать новый аккаунт"}
+            secondary
+            disabled={task.busy}
             onPress={() => {
-              if (!sent) {
-                void send();
-                return;
-              }
-              void task.run(async () => {
-                const { error } = await supabase.auth.verifyOtp({
-                  email: email.trim(),
-                  token: code,
-                  type: "email",
-                });
-                if (error) throw error;
-              });
+              setRegistering((value) => !value);
+              task.setError(null);
             }}
           />
-          {sent && (
-            <>
-              <Button
-                title="Отправить код ещё раз"
-                secondary
-                disabled={task.busy}
-                onPress={() => void send()}
-              />
-              <Button
-                title="Изменить email"
-                secondary
-                onPress={() => {
-                  setSent(false);
-                  setCode("");
-                  task.setError(null);
-                }}
-              />
-            </>
-          )}
         </>
       )}
     </Screen>
