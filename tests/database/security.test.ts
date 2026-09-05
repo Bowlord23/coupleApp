@@ -23,6 +23,12 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
       readFileSync("supabase/migrations/20260905192934_initial.sql", "utf8"),
     );
     await db.exec(
+      readFileSync(
+        "supabase/migrations/20260905221356_accumulate_sticky_notes.sql",
+        "utf8",
+      ),
+    );
+    await db.exec(
       `insert into auth.users values('${A}'),('${B}'),('${C}'),('${D}')`,
     );
     async function as(user: string) {
@@ -218,14 +224,25 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
       },
     );
     await t.test(
-      "notes stay inside couple and cannot impersonate another author",
+      "notes accumulate, remain visible to their author and stay inside couple",
       async () => {
         await db.query("select public.save_note('Удачи сегодня!')");
-        await as(A);
-        assert.equal(
-          await scalar("select text from public.notes"),
-          "Удачи сегодня!",
+        assert.equal(await scalar("select count(*)::int from public.notes"), 1);
+        await db.exec("reset role");
+        await db.exec(
+          "update public.notes set created_at = now() - interval '11 seconds'",
         );
+        await as(B);
+        await db.query("select public.save_note('Я рядом')");
+        assert.equal(await scalar("select count(*)::int from public.notes"), 2);
+        await as(A);
+        const notes = await db.query<{ text: string }>(
+          "select text from public.notes order by created_at",
+        );
+        assert.deepEqual(notes.rows.map((note) => note.text), [
+          "Удачи сегодня!",
+          "Я рядом",
+        ]);
         await assert.rejects(
           db.query(
             "insert into public.notes(couple_id,author_id,text) values($1,$2,$3)",

@@ -13,7 +13,12 @@ export async function loadSpace(userId: string): Promise<Space | null> {
     supabase.from("couples").select("*").eq("id", id).single(),
     supabase.from("couple_members").select("*").eq("couple_id", id),
     supabase.from("plants").select("*").eq("couple_id", id).single(),
-    supabase.from("notes").select("*").eq("couple_id", id),
+    supabase
+      .from("notes")
+      .select("*")
+      .eq("couple_id", id)
+      .order("created_at", { ascending: false })
+      .limit(100),
     supabase
       .from("memories")
       .select("*")

@@ -19,6 +19,8 @@ import { APP_NAME, GROWTH_CONFIG } from "../../constants/product";
 import { theme } from "../../constants/theme";
 import { cooldownRemaining, daysTogether } from "./rules";
 import { NoteSheet } from "../notes/NoteSheet";
+import { StickyNotes } from "../notes/StickyNotes";
+import { stickyColorFor } from "../notes/colors";
 export default function HomeScreen() {
   const app = useApp();
   const task = useTask();
@@ -35,7 +37,7 @@ export default function HomeScreen() {
   const space = app.space;
   if (!space) return null;
   const partner = space.members.find((m) => m.user_id !== app.session?.user.id);
-  const note = space.notes.find((n) => n.author_id !== app.session?.user.id);
+  const userId = app.session?.user.id ?? "";
   const remaining = cooldownRemaining(
     space.lastWater,
     now,
@@ -94,11 +96,14 @@ export default function HomeScreen() {
         </View>
       )}
       <View style={local.garden}>
-        <Plant
-          stage={space.plant.stage}
-          pulse={presence.reaction.id || pulse}
-          shared={presence.reaction.shared}
-        />
+        <View style={local.plantScene}>
+          <Plant
+            stage={space.plant.stage}
+            pulse={presence.reaction.id || pulse}
+            shared={presence.reaction.shared}
+          />
+          <StickyNotes notes={space.notes} members={space.members} userId={userId} />
+        </View>
         <Text style={local.plantName}>{space.plant.name}</Text>
         <Text style={local.presence}>
           {presence.here ? "●  " : "○  "}
@@ -108,14 +113,6 @@ export default function HomeScreen() {
           {presence.reaction.text || "Растём в своём ритме."}
         </Text>
       </View>
-      {note && (
-        <View style={local.note}>
-          <Text style={styles.label}>
-            ОТ {partner?.display_name.toUpperCase() ?? "ПАРТНЁРА"}
-          </Text>
-          <Text style={local.noteText}>{note.text}</Text>
-        </View>
-      )}
       {space.couple.invite_code && (
         <View style={local.invite}>
           <Copy>Пригласите партнёра</Copy>
@@ -174,7 +171,11 @@ export default function HomeScreen() {
         />
         <Button title="Мы" secondary onPress={() => router.push("/us")} />
       </View>
-      <NoteSheet visible={noteOpen} close={() => setNoteOpen(false)} />
+      <NoteSheet
+        visible={noteOpen}
+        color={stickyColorFor(userId, space.members)}
+        close={() => setNoteOpen(false)}
+      />
     </Screen>
   );
 }
@@ -184,6 +185,12 @@ const local = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 10,
+  },
+  plantScene: {
+    width: "100%",
+    minHeight: 360,
+    alignItems: "center",
+    justifyContent: "center",
   },
   plantName: {
     fontSize: 25,
@@ -206,13 +213,6 @@ const local = StyleSheet.create({
     minHeight: 36,
     marginTop: 14,
   },
-  note: {
-    paddingLeft: 18,
-    borderLeftWidth: 2,
-    borderColor: theme.border,
-    gap: 8,
-  },
-  noteText: { fontSize: 19, lineHeight: 28, color: theme.text },
   invite: { gap: 12 },
   code: { fontSize: 26, letterSpacing: 5, color: theme.accent },
 });
