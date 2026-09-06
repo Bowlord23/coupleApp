@@ -10,7 +10,7 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
   const db = new PGlite();
   try {
     // Only Supabase-owned infrastructure is stubbed; all application SQL is the real migration.
-    await db.exec(`create role anon; create role authenticated; create schema auth; create schema realtime;
+    await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create schema realtime;
       create table auth.users(id uuid primary key);
       create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
       create table realtime.messages(extension text, topic text); alter table realtime.messages enable row level security;
@@ -25,6 +25,12 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
     await db.exec(
       readFileSync(
         "supabase/migrations/20260905221356_accumulate_sticky_notes.sql",
+        "utf8",
+      ),
+    );
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/20260905223721_draggable_notes_and_partner_pokes.sql",
         "utf8",
       ),
     );
@@ -243,6 +249,19 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
           "Удачи сегодня!",
           "Я рядом",
         ]);
+        const noteId = await scalar(
+          "select id from public.notes order by created_at desc limit 1",
+        );
+        await db.query("select public.move_note($1,$2,$3)", [noteId, 0.2, 0.7]);
+        assert.equal(
+          await scalar("select position_x from public.notes where id=$1", [noteId]),
+          0.2,
+        );
+        await db.query("select public.archive_note($1)", [noteId]);
+        assert.equal(
+          await scalar("select archived_at is not null from public.notes where id=$1", [noteId]),
+          true,
+        );
         await assert.rejects(
           db.query(
             "insert into public.notes(couple_id,author_id,text) values($1,$2,$3)",
@@ -258,6 +277,21 @@ test("actual migration, RPC rules and RLS under authenticated role", async (t) =
         );
       },
     );
+    await t.test("partner pokes are authenticated, idempotent and throttled", async () => {
+      await as(A);
+      const request = crypto.randomUUID();
+      assert.equal(await scalar("select public.poke_partner($1)", [request]), B);
+      assert.equal(await scalar("select public.poke_partner($1)", [request]), B);
+      await assert.rejects(
+        db.query("select public.poke_partner($1)", [crypto.randomUUID()]),
+        /POKE_RATE_LIMIT/,
+      );
+      await as(C);
+      await assert.rejects(
+        db.query("select public.poke_partner($1)", [crypto.randomUUID()]),
+        /FORBIDDEN/,
+      );
+    });
     await t.test(
       "private channel policies reject strangers and client broadcasts",
       async () => {

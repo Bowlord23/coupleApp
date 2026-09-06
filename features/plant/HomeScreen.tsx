@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const haptic = useHaptics();
   const [noteOpen, setNoteOpen] = useState(false);
   const [pulse, setPulse] = useState("");
+  const [attention, setAttention] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const pending = useRef<{ kind: "water" | "touch"; id: string } | null>(null);
   useEffect(() => {
@@ -60,6 +61,40 @@ export default function HomeScreen() {
       haptic(data?.shared ? "shared" : kind);
       setPulse(request.id);
       await app.refresh();
+    });
+  }
+  async function moveNote(id: string, x: number, y: number) {
+    return task.run(async () => {
+      const { error } = await supabase.rpc("move_note", { target_note: id, x, y });
+      if (error) throw error;
+      await app.refresh();
+    });
+  }
+  async function archiveNote(id: string) {
+    return task.run(async () => {
+      const { error } = await supabase.rpc("archive_note", { target_note: id });
+      if (error) throw error;
+      await app.refresh();
+    });
+  }
+  async function pokePartner() {
+    const id = randomUUID();
+    await task.run(async () => {
+      const { error } = await supabase.functions.invoke("notify-partner", {
+        body: { request_id: id },
+      });
+      if (error) {
+        let detail = error.message;
+        if ("context" in error && error.context instanceof Response) {
+          const body = await error.context.clone().json().catch(() => null);
+          if (body && typeof body.error === "string") detail = body.error;
+        }
+        throw new Error(detail);
+      }
+      haptic("shared");
+      setPulse(id);
+      setAttention("Сердечко отправлено партнёру 💛");
+      setTimeout(() => setAttention(""), 5000);
     });
   }
   const presenceText = !partner
@@ -102,7 +137,14 @@ export default function HomeScreen() {
             pulse={presence.reaction.id || pulse}
             shared={presence.reaction.shared}
           />
-          <StickyNotes notes={space.notes} members={space.members} userId={userId} />
+          <StickyNotes
+            notes={space.notes}
+            members={space.members}
+            userId={userId}
+            moved={moveNote}
+            archived={archiveNote}
+            held={() => haptic("tap")}
+          />
         </View>
         <Text style={local.plantName}>{space.plant.name}</Text>
         <Text style={local.presence}>
@@ -110,7 +152,7 @@ export default function HomeScreen() {
           {presenceText}
         </Text>
         <Text accessibilityLiveRegion="polite" style={local.moment}>
-          {presence.reaction.text || "Растём в своём ритме."}
+          {presence.reaction.text || attention || "Растём в своём ритме."}
         </Text>
       </View>
       {space.couple.invite_code && (
@@ -164,12 +206,20 @@ export default function HomeScreen() {
         }}
       />
       <View style={styles.row}>
-        <Button
-          title="Моменты"
-          secondary
-          onPress={() => router.push("/memories")}
-        />
-        <Button title="Мы" secondary onPress={() => router.push("/us")} />
+        <View style={local.navButton}>
+          <Button title="Моменты" secondary onPress={() => router.push("/memories")} />
+        </View>
+        <View style={local.navButton}>
+          <Button
+            title="Тыкнуть 💛"
+            secondary
+            disabled={task.busy || !app.online || !partner}
+            onPress={() => void pokePartner()}
+          />
+        </View>
+        <View style={local.navButton}>
+          <Button title="Мы" secondary onPress={() => router.push("/us")} />
+        </View>
       </View>
       <NoteSheet
         visible={noteOpen}
@@ -215,4 +265,5 @@ const local = StyleSheet.create({
   },
   invite: { gap: 12 },
   code: { fontSize: 26, letterSpacing: 5, color: theme.accent },
+  navButton: { flex: 1 },
 });

@@ -71,6 +71,28 @@ export function usePresence() {
             () => setReaction({ id: "", shared: false, text: "" }),
             6000,
           );
+        })
+        .on("broadcast", { event: "attention" }, ({ payload }) => {
+          if (
+            disposed ||
+            !payload ||
+            payload.user_id === uid ||
+            typeof payload.id !== "string" ||
+            typeof payload.at !== "string" ||
+            Date.now() - Date.parse(payload.at) > 15_000
+          )
+            return;
+          haptic("shared");
+          setReaction({
+            id: payload.id,
+            shared: true,
+            text: `${partnerName} отправил(а) вам сердечко 💛`,
+          });
+          clearTimeout(expiry);
+          expiry = setTimeout(
+            () => setReaction({ id: "", shared: false, text: "" }),
+            6000,
+          );
         });
       for (const table of [
         "plants",

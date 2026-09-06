@@ -3,7 +3,6 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 
-// P1 integration point: call only from an explicit opt-in after the server sender is deployed.
 export async function registerPushToken(userId: string): Promise<void> {
   if (
     !Device.isDevice ||
@@ -15,10 +14,19 @@ export async function registerPushToken(userId: string): Promise<void> {
   if (!projectId) throw new Error("EAS project not configured");
   const Notifications = await import("expo-notifications");
   if (Platform.OS === "android")
-    await Notifications.setNotificationChannelAsync("notes", {
-      name: "Записки партнёра",
-      importance: Notifications.AndroidImportance.DEFAULT,
+    await Notifications.setNotificationChannelAsync("attention", {
+      name: "Знаки внимания",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 180, 100, 180],
     });
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
   const existing = await Notifications.getPermissionsAsync();
   const permission = existing.granted
     ? existing

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1053184583618",
+    "project_id": "ourplant-notifications",
+    "storage_bucket": "ourplant-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053184583618:android:dc63d7d2e594d8d340d85b",
+        "android_client_info": {
+          "package_name": "com.bowlord23.ourplant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwoAJ--LHRc72YDnjDxa02IcmK_Rf9soY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

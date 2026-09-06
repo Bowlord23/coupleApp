@@ -34,6 +34,9 @@ export type Note = {
   couple_id: string;
   author_id: string;
   text: string;
+  position_x: number;
+  position_y: number;
+  archived_at: string | null;
   created_at: string;
 };
 export type Memory = {
@@ -83,6 +86,12 @@ export type Database = {
         Returns: { shared: boolean; duplicate: boolean };
       };
       save_note: { Args: { body: string }; Returns: undefined };
+      move_note: {
+        Args: { target_note: string; x: number; y: number };
+        Returns: undefined;
+      };
+      archive_note: { Args: { target_note: string }; Returns: undefined };
+      poke_partner: { Args: { request_id: string }; Returns: string };
       update_profile: {
         Args: { new_name: string; enable_haptics: boolean };
         Returns: undefined;

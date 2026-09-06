@@ -12,6 +12,9 @@ export function friendlyError(error: unknown): string {
     INVALID_NAME: "Введите имя длиной от 1 до 40 символов.",
     INVALID_NOTE: "Записка должна содержать от 1 до 180 символов.",
     RATE_LIMIT: "Слишком много попыток. Подождите минуту.",
+    POKE_RATE_LIMIT: "Сердечко уже отправлено. Подождите немного.",
+    NO_PARTNER: "Сначала пригласите партнёра.",
+    INVALID_POSITION: "Не удалось переместить записку. Попробуйте ещё раз.",
   };
   for (const [code, text] of Object.entries(messages))
     if (message.includes(code)) return text;

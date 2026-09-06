@@ -15,6 +15,7 @@ import { friendlyError } from "../../lib/errors";
 import { loadSpace } from "../../services/space";
 import { REFRESH_INTERVAL_MS } from "../../constants/product";
 import type { Profile, Space } from "../../types/database";
+import { disablePush, registerPushToken } from "../../services/notifications";
 
 type State = {
   session: Session | null;
@@ -104,6 +105,10 @@ export function AppProvider({ children }: PropsWithChildren) {
     void Promise.resolve().then(refresh);
   }, [refresh]);
   useEffect(() => {
+    if (!userId || (space?.members.length ?? 0) < 2) return;
+    void registerPushToken(userId).catch(() => undefined);
+  }, [userId, space?.members.length]);
+  useEffect(() => {
     const stop = NetInfo.addEventListener((state) => {
       const connected =
         state.isConnected !== false && state.isInternetReachable !== false;
@@ -127,7 +132,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       supabase.auth.stopAutoRefresh();
     };
   }, [refresh]);
+  const signOutUserId = session?.user.id;
   const signOut = useCallback(async () => {
+    if (signOutUserId)
+      await disablePush(signOutUserId).catch(() => undefined);
     const { error: e } = await supabase.auth.signOut({ scope: "local" });
     if (e) throw e;
     generation.current++;
@@ -136,7 +144,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setReady(false);
     setError(null);
-  }, []);
+  }, [signOutUserId]);
   return (
     <Context.Provider
       value={{
