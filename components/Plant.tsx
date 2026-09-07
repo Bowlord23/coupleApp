@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, Animated, Easing, View } from "react-native";
-import Svg, { Ellipse, Path, Circle, G } from "react-native-svg";
+import Svg, { Ellipse, Path, Circle, G, Rect } from "react-native-svg";
 import { theme } from "../constants/theme";
 const names = [
   "Семечко",
@@ -10,14 +10,112 @@ const names = [
   "Большое растение",
   "Цветение",
 ];
+
+function WateringAnimation({ signal, reduce }: { signal: string; reduce: boolean }) {
+  const [tilt] = useState(() => new Animated.Value(0));
+  const [drop] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!signal) return;
+    tilt.setValue(0);
+    drop.setValue(0);
+    if (reduce) return;
+    const animation = Animated.parallel([
+      Animated.sequence([
+        Animated.timing(tilt, {
+          toValue: 1,
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1250),
+        Animated.timing(tilt, {
+          toValue: 0,
+          duration: 360,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(drop, {
+            toValue: 1,
+            duration: 430,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(drop, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        { iterations: 4 },
+      ),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [drop, reduce, signal, tilt]);
+  if (!signal) return null;
+  return (
+    <>
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          right: 3,
+          top: 42,
+          zIndex: 4,
+          transform: [{
+            rotate: tilt.interpolate({ inputRange: [0, 1], outputRange: ["4deg", "-20deg"] }),
+          }],
+        }}
+      >
+        <Svg width="92" height="70" viewBox="0 0 92 70">
+          <Path d="M35 27 9 15 5 22 35 40Z" fill={theme.leaf} />
+          <Path d="M8 15 2 12 1 18 5 22Z" fill={theme.accent} />
+          <Rect x="33" y="21" width="42" height="36" rx="9" fill={theme.accent} />
+          <Path d="M69 26 C91 15 94 53 74 54" fill="none" stroke={theme.leaf} strokeWidth="7" />
+          <Path d="M42 21 Q54 10 65 21" fill="none" stroke={theme.soil} strokeWidth="4" />
+          <Circle cx="52" cy="39" r="5" fill={theme.pale} opacity={0.75} />
+        </Svg>
+      </Animated.View>
+      {!reduce && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            right: 77,
+            top: 94,
+            opacity: drop.interpolate({
+              inputRange: [0, 0.12, 0.82, 1],
+              outputRange: [0, 1, 0.9, 0],
+            }),
+            transform: [{
+              translateY: drop.interpolate({ inputRange: [0, 1], outputRange: [0, 58] }),
+            }],
+          }}
+        >
+          <Svg width="42" height="34" viewBox="0 0 42 34">
+            <Path d="M7 2 C2 10 2 15 7 15 C12 15 12 10 7 2Z" fill="#78AFC5" />
+            <Path d="M21 0 C15 10 15 16 21 16 C27 16 27 10 21 0Z" fill="#78AFC5" />
+            <Path d="M35 4 C30 12 30 17 35 17 C40 17 40 12 35 4Z" fill="#78AFC5" />
+          </Svg>
+        </Animated.View>
+      )}
+    </>
+  );
+}
+
 export function Plant({
   stage = 0,
   pulse = "",
   shared = false,
+  watering = "",
 }: {
   stage?: number;
   pulse?: string;
   shared?: boolean;
+  watering?: string;
 }) {
   const [scale] = useState(() => new Animated.Value(1));
   const [sway] = useState(() => new Animated.Value(0));
@@ -93,6 +191,7 @@ export function Plant({
           ],
         }}
       >
+        <WateringAnimation signal={watering} reduce={reduce} />
         <Svg width="280" height="310" viewBox="0 0 280 310">
           <Circle
             cx="140"

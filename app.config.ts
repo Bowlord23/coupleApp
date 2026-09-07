@@ -4,11 +4,11 @@ const config: ExpoConfig = {
   name: product.name,
   slug: product.slug,
   owner: "bowlord",
-  version: "1.1.0",
+  version: "1.2.0",
   scheme: product.scheme,
   orientation: "portrait",
   userInterfaceStyle: "light",
-  icon: "./assets/icon.png",
+  icon: "./assets/icon-v2.png",
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.bowlord23.ourplant",
@@ -17,6 +17,10 @@ const config: ExpoConfig = {
   android: {
     package: "com.bowlord23.ourplant",
     googleServicesFile: "./google-services.json",
+    adaptiveIcon: {
+      foregroundImage: "./assets/icon-v2.png",
+      backgroundColor: "#F7F5EF",
+    },
   },
   extra: { eas: { projectId: "985492ed-d728-4ba5-85a4-43a8c0079152" } },
   updates: { url: "https://u.expo.dev/985492ed-d728-4ba5-85a4-43a8c0079152" },

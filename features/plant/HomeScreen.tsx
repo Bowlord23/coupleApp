@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Share, StyleSheet, Text, View } from "react-native";
+import { Linking, Share, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import {
@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const haptic = useHaptics();
   const [noteOpen, setNoteOpen] = useState(false);
   const [pulse, setPulse] = useState("");
+  const [watering, setWatering] = useState("");
   const [attention, setAttention] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const pending = useRef<{ kind: "water" | "touch"; id: string } | null>(null);
@@ -60,6 +61,13 @@ export default function HomeScreen() {
       pending.current = null;
       haptic(data?.shared ? "shared" : kind);
       setPulse(request.id);
+      if (kind === "water") {
+        setWatering(request.id);
+        setTimeout(
+          () => setWatering((current) => current === request.id ? "" : current),
+          2400,
+        );
+      }
       await app.refresh();
     });
   }
@@ -80,20 +88,30 @@ export default function HomeScreen() {
   async function pokePartner() {
     const id = randomUUID();
     await task.run(async () => {
-      const { error } = await supabase.functions.invoke("notify-partner", {
+      const { data, error } = await supabase.functions.invoke("notify-partner", {
         body: { request_id: id },
       });
       if (error) {
         let detail = error.message;
-        if ("context" in error && error.context instanceof Response) {
-          const body = await error.context.clone().json().catch(() => null);
+        const context = "context" in error ? error.context : null;
+        if (
+          context &&
+          typeof context === "object" &&
+          "json" in context &&
+          typeof context.json === "function"
+        ) {
+          const body = await context.json().catch(() => null);
           if (body && typeof body.error === "string") detail = body.error;
         }
         throw new Error(detail);
       }
       haptic("shared");
       setPulse(id);
-      setAttention("Сердечко отправлено партнёру 💛");
+      setAttention(
+        Number(data?.delivered ?? 0) > 0
+          ? "Сердечко и уведомление отправлены партнёру 💛"
+          : "Сердечко отправлено — партнёр увидит его в приложении 💛",
+      );
       setTimeout(() => setAttention(""), 5000);
     });
   }
@@ -130,12 +148,25 @@ export default function HomeScreen() {
           />
         </View>
       )}
+      {app.pushStatus === "permission-denied" && (
+        <View style={local.notificationNotice}>
+          <Copy>
+            Уведомления выключены. Без них сердечки появятся только когда приложение открыто.
+          </Copy>
+          <Button
+            title="Разрешить уведомления"
+            secondary
+            onPress={() => void Linking.openSettings()}
+          />
+        </View>
+      )}
       <View style={local.garden}>
         <View style={local.plantScene}>
           <Plant
             stage={space.plant.stage}
             pulse={presence.reaction.id || pulse}
             shared={presence.reaction.shared}
+            watering={watering}
           />
           <StickyNotes
             notes={space.notes}
@@ -266,4 +297,5 @@ const local = StyleSheet.create({
   invite: { gap: 12 },
   code: { fontSize: 26, letterSpacing: 5, color: theme.accent },
   navButton: { flex: 1 },
+  notificationNotice: { gap: 10 },
 });

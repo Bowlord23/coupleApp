@@ -15,7 +15,11 @@ import { friendlyError } from "../../lib/errors";
 import { loadSpace } from "../../services/space";
 import { REFRESH_INTERVAL_MS } from "../../constants/product";
 import type { Profile, Space } from "../../types/database";
-import { disablePush, registerPushToken } from "../../services/notifications";
+import {
+  disablePush,
+  registerPushToken,
+  type PushStatus,
+} from "../../services/notifications";
 
 type State = {
   session: Session | null;
@@ -25,6 +29,7 @@ type State = {
   ready: boolean;
   online: boolean;
   error: string | null;
+  pushStatus: PushStatus | "retrying";
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -37,6 +42,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<PushStatus | "retrying">("retrying");
   const generation = useRef(0);
   const alive = useRef(true);
   const userId = session?.user.id;
@@ -59,6 +65,15 @@ export function AppProvider({ children }: PropsWithChildren) {
         setError(friendlyError(e));
     }
   }, [userId]);
+  const syncPush = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const status = await registerPushToken(userId);
+      if (alive.current) setPushStatus(status);
+    } catch {
+      if (alive.current) setPushStatus("retrying");
+    }
+  }, [userId]);
   useEffect(() => {
     if (!isConfigured) return;
     alive.current = true;
@@ -72,6 +87,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         setSpace(null);
         setProfile(null);
         setReady(false);
+        setPushStatus("retrying");
       }
       currentUser = next?.user.id;
       setSession(next);
@@ -105,9 +121,8 @@ export function AppProvider({ children }: PropsWithChildren) {
     void Promise.resolve().then(refresh);
   }, [refresh]);
   useEffect(() => {
-    if (!userId || (space?.members.length ?? 0) < 2) return;
-    void registerPushToken(userId).catch(() => undefined);
-  }, [userId, space?.members.length]);
+    void Promise.resolve().then(syncPush);
+  }, [syncPush]);
   useEffect(() => {
     const stop = NetInfo.addEventListener((state) => {
       const connected =
@@ -120,18 +135,23 @@ export function AppProvider({ children }: PropsWithChildren) {
       if (state === "active") {
         supabase.auth.startAutoRefresh();
         void refresh();
+        void syncPush();
       } else supabase.auth.stopAutoRefresh();
     });
     const timer = setInterval(() => {
       if (AppState.currentState === "active") void refresh();
     }, REFRESH_INTERVAL_MS);
+    const pushTimer = setInterval(() => {
+      if (AppState.currentState === "active") void syncPush();
+    }, 5 * 60_000);
     return () => {
       stop();
       listener.remove();
       clearInterval(timer);
+      clearInterval(pushTimer);
       supabase.auth.stopAutoRefresh();
     };
-  }, [refresh]);
+  }, [refresh, syncPush]);
   const signOutUserId = session?.user.id;
   const signOut = useCallback(async () => {
     if (signOutUserId)
@@ -144,6 +164,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setReady(false);
     setError(null);
+    setPushStatus("retrying");
   }, [signOutUserId]);
   return (
     <Context.Provider
@@ -155,6 +176,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         ready,
         online,
         error,
+        pushStatus,
         refresh,
         signOut,
       }}
